@@ -331,7 +331,7 @@ async def chat(req_body: ChatRequest, request: Request):
     
     client_ip = request.client.host if request.client else "unknown"
 
-    # ── Rate limit check ──────────────────────────────────────────────────────
+    # Rate limit check 
     if is_rate_limited(client_ip):
         raise HTTPException(
             status_code=429,
