@@ -1,6 +1,6 @@
 """
 setup_database.py
------------------
+
 Creates clinic.db with 5 tables and inserts all realistic dummy data.
 
 Run:  python setup_database.py
@@ -11,14 +11,12 @@ import sqlite3
 import random
 from datetime import datetime, timedelta, date
 
-# ── Reproducible seed so the data is the same every run ──────────────────────
 random.seed(42)
 DB_PATH = "clinic.db"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Utility helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def rand_date_past(months: int = 12) -> date:
     """Random calendar date within the last `months` months."""
@@ -52,9 +50,8 @@ def rand_phone() -> str:
     return f"+91-{random.randint(7000000000, 9999999999)}"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Reference data pools
-# ─────────────────────────────────────────────────────────────────────────────
 
 FIRST_NAMES = [
     "Aarav", "Aditya", "Akash", "Amara", "Amelia", "Ananya", "Arjun", "Aryan",
@@ -120,10 +117,8 @@ APPT_NOTES = [
 ]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Schema
-# ─────────────────────────────────────────────────────────────────────────────
 
+# Schema
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
 
@@ -180,10 +175,7 @@ CREATE TABLE invoices (
 );
 """
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Insertion helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def insert_doctors(cur) -> list[int]:
     # 3 doctors per specialization → exactly 15
@@ -309,9 +301,7 @@ def insert_invoices(cur, patient_ids: list[int]):
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Main
-# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     print("🏥  Building clinic.db ...")
@@ -337,7 +327,7 @@ def main():
 
     conn.commit()
 
-    # ── Summary ──────────────────────────────────────────────────────────────
+    # Summary 
     def count(table):
         return cur.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
