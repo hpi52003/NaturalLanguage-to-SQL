@@ -30,9 +30,8 @@ from pydantic import BaseModel, Field, field_validator # type: ignore
 from vanna_setup import build_agent, DB_PATH
 from sql_validator import validate_sql, ValidationError
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Logging
-# ─────────────────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,9 +40,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("clinic.api")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# App state — agent is built once at startup and reused across requests
-# ─────────────────────────────────────────────────────────────────────────────
+
+# App state 
 
 class AppState:
     agent = None
@@ -67,9 +65,7 @@ async def lifespan(app: FastAPI):
     log.info("Shutting down.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # FastAPI app
-# ─────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Clinic NL2SQL API",
@@ -85,10 +81,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Rate limiting — simple per-IP token bucket (bonus requirement)
-# ─────────────────────────────────────────────────────────────────────────────
 
+# Rate limiting 
 _rate_store: dict[str, list[float]] = {}
 RATE_LIMIT   = 20    # requests
 RATE_WINDOW  = 60.0  # seconds
@@ -105,11 +99,7 @@ def is_rate_limited(ip: str) -> bool:
     _rate_store[ip] = timestamps
     return False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Request / Response models
-# ─────────────────────────────────────────────────────────────────────────────
-
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=500)
 
@@ -140,40 +130,27 @@ class HealthResponse(BaseModel):
     agent_memory_items:  int
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _extract_sql_from_response(agent_response: str) -> str | None:
-    """
-    Pull the SQL out of whatever text the agent returns.
-    Tries four strategies in order of reliability.
-    """
-    # Strategy 1: markdown code fence  ```sql ... ```
+   
     fence = re.search(r"```(?:sql)?\s*([\s\S]+?)```", agent_response, re.IGNORECASE)
     if fence:
         return fence.group(1).strip()
 
-    # Strategy 2: line starting with SELECT / WITH
     for line in agent_response.splitlines():
         if re.match(r"^\s*(SELECT|WITH)\b", line, re.IGNORECASE):
-            # grab from this line to end-of-block (heuristic: stop at blank line)
             idx = agent_response.index(line)
             block = agent_response[idx:]
             end = re.search(r"\n\s*\n", block)
             return block[: end.start()].strip() if end else block.strip()
-
-    # Strategy 3: anything between SELECT and semicolon
     sel = re.search(r"(SELECT[\s\S]+?;)", agent_response, re.IGNORECASE)
     if sel:
         return sel.group(1).strip()
 
-    # Strategy 4: give up
     return None
 
 
 def _run_sql_on_db(sql: str) -> pd.DataFrame:
-    """Execute a validated SELECT query and return a DataFrame."""
     conn = sqlite3.connect(DB_PATH)
     try:
         df = pd.read_sql_query(sql, conn)
@@ -183,7 +160,6 @@ def _run_sql_on_db(sql: str) -> pd.DataFrame:
 
 
 def _pick_chart_type(df: pd.DataFrame) -> str:
-    """Heuristic to choose the most appropriate chart type."""
     cols = df.columns.tolist()
     n_numeric = sum(pd.api.types.is_numeric_dtype(df[c]) for c in cols)
 
@@ -200,10 +176,6 @@ def _pick_chart_type(df: pd.DataFrame) -> str:
 
 
 def _build_chart(df: pd.DataFrame) -> tuple[dict | None, str | None]:
-    """
-    Return a (plotly-json-dict, chart_type) pair, or (None, None) if
-    the data isn't suitable for charting.
-    """
     if df.empty or len(df.columns) < 2:
         return None, None
 
@@ -211,7 +183,6 @@ def _build_chart(df: pd.DataFrame) -> tuple[dict | None, str | None]:
         chart_type = _pick_chart_type(df)
         cols       = df.columns.tolist()
         x_col      = cols[0]
-        # pick the first numeric column as y
         numeric_cols = [c for c in cols[1:] if pd.api.types.is_numeric_dtype(df[c])]
         if not numeric_cols:
             return None, None
@@ -234,10 +205,6 @@ def _build_chart(df: pd.DataFrame) -> tuple[dict | None, str | None]:
 
 
 async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
-    """
-    Send the question to the Vanna 2.0 agent and collect structured response.
-    Handles all UiComponent types returned by Vanna 2.0.2.
-    """
     from vanna.core.user import RequestContext # type: ignore
     from vanna.components.rich import ( # type: ignore
         ArtifactComponent, DataFrameComponent, RichTextComponent,
@@ -270,7 +237,7 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
                 if val and field not in ("id","type","lifecycle","data","children","timestamp","visible","interactive"):
                     log.info(f"  [{rich_type}] {field} = {str(val)[:120]}")
 
-        # ── ArtifactComponent: SQL query or other code ────────────────────
+        # ArtifactComponent
         if isinstance(rich, ArtifactComponent):
             atype = getattr(rich, "artifact_type", "") or ""
             content = getattr(rich, "content", "") or ""
@@ -281,7 +248,7 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
                 if content:
                     result["text"].append(content)
 
-        # ── DataFrameComponent: result rows ───────────────────────────────
+        # DataFrameComponent
         elif isinstance(rich, DataFrameComponent):
             result["columns"] = rich.columns or []
             result["rows"] = [
@@ -290,7 +257,7 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
             ]
             log.info(f"[agent] DataFrame: {len(result['rows'])} rows, cols={result['columns']}")
 
-        # ── RichTextComponent ─────────────────────────────────────────────
+        # RichTextComponent 
         elif isinstance(rich, RichTextComponent):
             content = getattr(rich, "content", "") or ""
             # Could contain SQL in a code block
@@ -301,33 +268,33 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
             if content:
                 result["text"].append(content)
 
-        # ── CardComponent ─────────────────────────────────────────────────
+        # CardComponent 
         elif isinstance(rich, CardComponent):
             for attr in ("content", "title", "subtitle"):
                 val = getattr(rich, attr, None)
                 if val:
                     result["text"].append(str(val))
 
-        # ── NotificationComponent ─────────────────────────────────────────
+        # NotificationComponent
         elif isinstance(rich, NotificationComponent):
             msg = getattr(rich, "message", None)
             if msg:
                 result["text"].append(msg)
 
-        # ── StatusCardComponent ───────────────────────────────────────────
+        # StatusCardComponent 
         elif isinstance(rich, StatusCardComponent):
             for attr in ("title", "description"):
                 val = getattr(rich, attr, None)
                 if val:
                     result["text"].append(str(val))
 
-        # ── TaskTrackerUpdate (progress messages like "Processing...") ────
+        # TaskTrackerUpdate 
         elif isinstance(rich, TaskTrackerUpdateComponent):
             detail = getattr(rich, "detail", None)
             if detail:
                 result["text"].append(str(detail))
 
-        # ── SimpleTextComponent fallback ──────────────────────────────────
+        # SimpleTextComponent fallback 
         elif isinstance(simple, SimpleTextComponent):
             txt = getattr(simple, "text", "") or ""
             if not result["sql"] and "SELECT" in txt.upper():
@@ -337,7 +304,7 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
             if txt:
                 result["text"].append(txt)
 
-        # ── Generic fallback: scan all string fields ──────────────────────
+        
         elif rich is not None:
             for attr in ("content", "text", "message", "description"):
                 val = getattr(rich, attr, None)
@@ -349,7 +316,6 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
                     result["text"].append(val)
                     break
 
-    # ── If still no SQL, try to extract from all collected text ──────────
     if not result["sql"]:
         combined = " ".join(result["text"])
         result["sql"] = _extract_sql_from_response(combined)
@@ -357,19 +323,12 @@ async def _ask_agent(question: str, remote_addr: str = "127.0.0.1") -> dict:
     return result
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req_body: ChatRequest, request: Request):
-    """
-    Accept a plain-English question and return:
-      - The generated SQL
-      - Result rows and column names
-      - An optional Plotly chart
-      - A human-readable summary message
-    """
+    
     client_ip = request.client.host if request.client else "unknown"
 
     # ── Rate limit check ──────────────────────────────────────────────────────
@@ -382,13 +341,13 @@ async def chat(req_body: ChatRequest, request: Request):
     question = req_body.question
     log.info(f"[/chat] question='{question}' ip={client_ip}")
 
-    # ── Cache hit ─────────────────────────────────────────────────────────────
+    # Cache hit 
     cache_key = question.lower().strip()
     if cache_key in state.query_cache:
         log.info("[/chat] Cache hit — returning cached response.")
         return JSONResponse(content=state.query_cache[cache_key])
 
-    # ── Ask the agent ─────────────────────────────────────────────────────────
+    # Ask the agent
     try:
         agent_result = await _ask_agent(question, remote_addr=client_ip)
         log.info(f"[/chat] Agent responded — sql={'yes' if agent_result['sql'] else 'no'}, rows={len(agent_result['rows'])}")
@@ -396,7 +355,7 @@ async def chat(req_body: ChatRequest, request: Request):
         log.error(f"[/chat] Agent error: {exc}")
         raise HTTPException(status_code=500, detail=f"Agent error: {str(exc)}")
 
-    # ── Extract SQL (from agent components, or fall back to text parsing) ─────
+    # Extract SQL 
     sql = agent_result["sql"]
     if not sql:
         combined_text = " ".join(agent_result["text"])
@@ -406,14 +365,14 @@ async def chat(req_body: ChatRequest, request: Request):
 
     has_rows = bool(agent_result["rows"] and agent_result["columns"])
 
-    # ── If no SQL AND no rows — agent couldn't answer ─────────────────────────
+    # If no SQL AND no rows — agent couldn't answer 
     if not sql and not has_rows:
         friendly = " ".join(agent_result["text"]).strip()
         return ChatResponse(
             message=friendly or "I could not generate a SQL query for that question. Please try rephrasing it."
         )
 
-    # ── Validate SQL if we have one (security gate) ───────────────────────────
+    # Validate SQL if we have one (security gate) 
     if sql:
         try:
             validate_sql(sql)
@@ -426,7 +385,7 @@ async def chat(req_body: ChatRequest, request: Request):
                     sql_query=sql,
                 )
 
-    # ── Build DataFrame: prefer agent rows, else run SQL ourselves ────────────
+    # Build DataFrame 
     if has_rows:
         columns = agent_result["columns"]
         rows    = agent_result["rows"]
@@ -443,7 +402,7 @@ async def chat(req_body: ChatRequest, request: Request):
                 sql_query=sql,
             )
 
-    # ── Empty result ──────────────────────────────────────────────────────────
+    # Empty result 
     if df.empty:
         return ChatResponse(
             message="No data found for your question.",
@@ -453,10 +412,10 @@ async def chat(req_body: ChatRequest, request: Request):
             row_count=0,
         )
 
-    # ── Build chart ───────────────────────────────────────────────────────────
+    # Build chart 
     chart, chart_type = _build_chart(df)
 
-    # ── Compose summary message ───────────────────────────────────────────────
+    # Compose summary message 
     row_word  = "row" if len(df) == 1 else "rows"
     agent_text = " ".join(agent_result["text"]).strip()
     # Filter out internal status messages from the agent
@@ -471,7 +430,7 @@ async def chat(req_body: ChatRequest, request: Request):
         + (f" Here is a {chart_type} chart of the results." if chart else "")
     )
 
-    # ── Serialise DataFrame ───────────────────────────────────────────────────
+    # Serialise DataFrame 
     columns = list(df.columns)
     rows    = df.where(pd.notnull(df), None).values.tolist()
 
@@ -485,7 +444,7 @@ async def chat(req_body: ChatRequest, request: Request):
         chart_type=chart_type,
     )
 
-    # ── Store in cache ────────────────────────────────────────────────────────
+    # Store in cache
     state.query_cache[cache_key] = response.model_dump()
 
     return response
@@ -493,14 +452,6 @@ async def chat(req_body: ChatRequest, request: Request):
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """
-    Liveness + readiness probe.
-
-    Returns:
-      - status: 'ok' or 'degraded'
-      - database: 'connected' or error description
-      - agent_memory_items: number of seeded Q→SQL pairs in memory
-    """
     # Check database
     db_status = "connected"
     try:
