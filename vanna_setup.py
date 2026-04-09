@@ -1,25 +1,7 @@
-"""
-vanna_setup.py
---------------
-Initializes the Vanna 2.0 Agent for the clinic NL2SQL system.
-
-Components wired here:
-  - GeminiLlmService        → LLM brain (gemini-2.5-flash)
-  - SqliteRunner            → executes SQL against clinic.db
-  - ToolRegistry            → RunSqlTool, VisualizeDataTool, memory tools
-  - DemoAgentMemory         → in-memory learning store (replaces ChromaDB)
-  - ClinicUserResolver      → identifies every caller as a default 'user'
-  - Agent                   → ties all components together
-
-Usage (imported by main.py and seed_memory.py):
-    from vanna_setup import build_agent
-    agent = build_agent()
-"""
-
 import os
 from dotenv import load_dotenv
 
-# ── Vanna 2.0 imports ─────────────────────────────────────────────────────────
+# Vanna 2.0 imports 
 from vanna import Agent, AgentConfig
 from vanna.core.registry import ToolRegistry
 from vanna.core.user import UserResolver, User, RequestContext
@@ -36,10 +18,6 @@ load_dotenv()  # reads GOOGLE_API_KEY from .env
 
 DB_PATH = "clinic.db"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Schema description injected into the system prompt so the LLM always knows
-# the full table structure — this dramatically improves SQL accuracy.
-# ─────────────────────────────────────────────────────────────────────────────
 
 CLINIC_SCHEMA_CONTEXT = """
 You are an expert SQL assistant for a clinic management system.
@@ -100,10 +78,8 @@ Important rules:
 """
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# User resolver — all requests treated as a single default 'user'
-# (In production you would extract identity from cookies / JWT)
-# ─────────────────────────────────────────────────────────────────────────────
+
+# User resolver
 
 class ClinicUserResolver(UserResolver):
     async def resolve_user(self, request_context: RequestContext) -> User:
@@ -114,9 +90,8 @@ class ClinicUserResolver(UserResolver):
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Builder function — call once at startup
-# ─────────────────────────────────────────────────────────────────────────────
+
+# Builder function 
 
 def build_agent() -> Agent:
     """
@@ -136,17 +111,17 @@ def build_agent() -> Agent:
         model="gemini-2.5-flash",
     )
 
-    # 2. SQLite runner — points at the clinic database
+    # 2. SQLite runner
     sql_runner = SqliteRunner(database_path=DB_PATH)
 
     # 3. In-memory agent memory (DemoAgentMemory)
     #    Stores successful Q→SQL pairs so the agent improves over the session
     agent_memory = DemoAgentMemory(max_items=1000)
 
-    # 4. Tool registry — register all required tools with access control
+    # 4. Tool registry 
     tools = ToolRegistry()
 
-    # SQL execution tool — every user can run SELECT queries
+    # SQL execution tool 
     tools.register_local_tool(
         RunSqlTool(sql_runner=sql_runner),
         access_groups=["user"],
@@ -158,7 +133,7 @@ def build_agent() -> Agent:
         access_groups=["user"],
     )
 
-    # Memory tools — let the agent save & retrieve correct Q→SQL pairs
+    # Memory tools 
     tools.register_local_tool(
         SaveQuestionToolArgsTool(),
         access_groups=["user"],
@@ -168,7 +143,7 @@ def build_agent() -> Agent:
         access_groups=["user"],
     )
 
-    # 5. Agent config — tune behaviour
+    # 5. Agent config 
     config = AgentConfig(
         system_prompt=CLINIC_SCHEMA_CONTEXT,
     )
