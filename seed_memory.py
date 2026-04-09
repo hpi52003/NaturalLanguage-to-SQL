@@ -1,6 +1,5 @@
 """
 seed_memory.py
---------------
 Pre-seeds the Vanna 2.0 DemoAgentMemory with 15+ verified question→SQL pairs
 so the agent starts with domain knowledge and doesn't have to learn from zero.
 
@@ -20,12 +19,11 @@ from vanna_setup import build_agent
 from vanna.core.tool import ToolContext # type: ignore
 from vanna.core.user import User # type: ignore
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Verified Q → SQL pairs (all tested against clinic.db schema)
-# ─────────────────────────────────────────────────────────────────────────────
+
+# Verified Q → SQL pairs 
 
 QA_PAIRS = [
-    # ── Patient queries ───────────────────────────────────────────────────────
+    # Patient queries 
     (
         "How many patients do we have?",
         "SELECT COUNT(*) AS total_patients FROM patients;",
@@ -58,7 +56,7 @@ QA_PAIRS = [
            WHERE registered_date >= DATE('now', '-6 months')
            ORDER BY registered_date DESC;""",
     ),
-    # ── Doctor queries ────────────────────────────────────────────────────────
+    # Doctor queries 
     (
         "List all doctors and their specializations",
         """SELECT name, specialization, department
@@ -82,7 +80,7 @@ QA_PAIRS = [
            GROUP BY d.id, d.name, d.specialization
            ORDER BY total_appointments DESC;""",
     ),
-    # ── Appointment queries ───────────────────────────────────────────────────
+    # Appointment queries 
     (
         "Show appointments for last month",
         """SELECT a.id, p.first_name, p.last_name, d.name AS doctor,
@@ -110,7 +108,7 @@ QA_PAIRS = [
            GROUP BY month
            ORDER BY month;""",
     ),
-    # ── Financial queries ─────────────────────────────────────────────────────
+    # Financial queries 
     (
         "What is the total revenue?",
         "SELECT SUM(total_amount) AS total_revenue FROM invoices;",
@@ -176,15 +174,9 @@ QA_PAIRS = [
 ]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Seeding logic — fixed for Vanna 2.0.2
-# ─────────────────────────────────────────────────────────────────────────────
 
 async def seed(agent):
-    """
-    Insert Q→SQL pairs into DemoAgentMemory using the correct
-    Vanna 2.0.2 API: save_tool_usage(question, tool_name, args, context).
-    """
     memory = agent.agent_memory
 
     # Build a ToolContext — required by Vanna 2.0.2
