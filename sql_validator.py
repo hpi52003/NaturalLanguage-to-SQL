@@ -1,39 +1,16 @@
-"""
-sql_validator.py
-----------------
-Standalone SQL validation layer.
-
-Rules enforced (from assignment Step 7):
-  1. Must be a SELECT statement — no DML or DDL allowed.
-  2. No dangerous keywords (EXEC, xp_, sp_, GRANT, REVOKE, SHUTDOWN, etc.)
-  3. No system table access (sqlite_master, sqlite_sequence, etc.)
-  4. Must not be empty.
-  5. Must not exceed a reasonable length (DoS protection).
-
-Usage:
-    from sql_validator import validate_sql, ValidationError
-
-    try:
-        validate_sql(generated_sql)
-    except ValidationError as e:
-        return {"error": str(e)}
-"""
-
 import re
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Configuration
-# ─────────────────────────────────────────────────────────────────────────────
 
 MAX_SQL_LENGTH = 4000  # characters
 
-# Keywords that signal DML / DDL — must never appear as the leading statement
+# Keywords that signal DML / DDL 
 FORBIDDEN_LEADING = {
     "INSERT", "UPDATE", "DELETE", "DROP", "ALTER",
     "CREATE", "TRUNCATE", "REPLACE", "MERGE",
 }
 
-# Keywords that are dangerous anywhere in the query
+# Keywords that are dangerous 
 FORBIDDEN_ANYWHERE = {
     "EXEC", "EXECUTE", "GRANT", "REVOKE", "SHUTDOWN",
     "ATTACH", "DETACH",
@@ -77,7 +54,7 @@ def validate_sql(sql: str) -> str:
 
     norm = _normalize(sql)
 
-    # ── Rule 1: Must start with SELECT ───────────────────────────────────────
+    # Rule 1: Must start with SELECT 
     first_token = norm.split()[0] if norm.split() else ""
     if first_token not in ("SELECT", "WITH"):
         # WITH … SELECT is a valid CTE — allow it
@@ -92,7 +69,7 @@ def validate_sql(sql: str) -> str:
             "Only SELECT queries are allowed."
         )
 
-    # ── Rule 2: No dangerous keywords anywhere in the query ──────────────────
+    # Rule 2: No dangerous keywords anywhere in the query 
     # Tokenise to avoid false positives like "EXECUTOR" matching "EXEC"
     tokens = set(re.findall(r"\b[A-Z_]+\b", norm))
     bad = tokens & FORBIDDEN_ANYWHERE
@@ -101,7 +78,7 @@ def validate_sql(sql: str) -> str:
             f"Security error: forbidden keyword(s) detected: {', '.join(sorted(bad))}."
         )
 
-    # ── Rule 3: No dangerous prefix patterns (xp_, sp_) ─────────────────────
+    # Rule 3: No dangerous prefix patterns (xp_, sp_) 
     for prefix in FORBIDDEN_PREFIXES:
         if prefix.upper() in norm:
             raise ValidationError(
@@ -109,7 +86,7 @@ def validate_sql(sql: str) -> str:
                 "are not permitted."
             )
 
-    # ── Rule 4: No system table access ───────────────────────────────────────
+    # Rule 4: No system table access
     for table in FORBIDDEN_TABLES:
         # Compare against the uppercased norm so case-insensitive detection works
         if re.search(r"\b" + re.escape(table.upper()) + r"\b", norm):
@@ -117,8 +94,7 @@ def validate_sql(sql: str) -> str:
                 f"Security error: access to system table '{table}' is not allowed."
             )
 
-    # ── Rule 5: No stacked statements (semicolon injection) ──────────────────
-    # Strip the trailing semicolon (allowed), then look for any remaining ones
+    # Rule 5: No stacked statements (semicolon injection)
     trimmed = sql.strip().rstrip(";")
     if ";" in trimmed:
         raise ValidationError(
