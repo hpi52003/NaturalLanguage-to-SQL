@@ -1,0 +1,16 @@
+# ─── Core Vanna 2.0 with Gemini + SQLite + FastAPI ───────────────────────────
+vanna[gemini,sqlite,fastapi]>=2.0.0
+
+# ─── LLM Provider ─────────────────────────────────────────────────────────────
+google-genai
+
+# ─── API Framework ────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+
+# ─── Data & Charting ──────────────────────────────────────────────────────────
+pandas
+plotly
+
+# ─── Config & Utilities ───────────────────────────────────────────────────────
+python-dotenv
