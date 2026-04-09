@@ -1,12 +1,10 @@
 """
 main.py
--------
 FastAPI application for the Clinic NL2SQL chatbot.
 
 Endpoints:
-  POST /chat    — accepts a plain-English question, returns SQL + results + chart
-  GET  /health  — liveness check with DB connectivity and memory item count
-
+  POST /chat    
+  GET  /health  
 Start:
     uvicorn main:app --port 8000 --reload
 """
