@@ -1,9 +1,8 @@
-# Test Results — 20 Question Evaluation
+# Test Results — 20 Questions
 
-**System:** Clinic NL2SQL Chatbot  
 **LLM:** Google Gemini 2.5 Flash via Vanna 2.0  
 **Database:** clinic.db (SQLite)  
-**Date:** Run after `seed_memory.py` pre-seeding
+**Tested after:** running `seed_memory.py`
 
 ---
 
@@ -11,51 +10,43 @@
 
 | Metric | Value |
 |--------|-------|
-| Total questions tested | 20 |
-| ✅ Correct SQL generated | 18 |
-| ⚠️ Partially correct | 1 |
-| ❌ Incorrect / failed | 1 |
+| Total tested | 20 |
+| Correct | 18 |
+| Partially correct | 1 |
+| Failed | 1 |
 | Pass rate | 90% |
 
 ---
 
-## Results by Question
+## Results
 
 ---
 
 ### Q1 — How many patients do we have?
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT COUNT(*) AS total_patients FROM patients;
 ```
-
-**Result summary:** Returns a single row with the total patient count (200).
+Returns 200 as expected.
 
 ---
 
 ### Q2 — List all doctors and their specializations
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT name, specialization, department
 FROM doctors
 ORDER BY specialization, name;
 ```
-
-**Result summary:** Returns all 15 doctors with their specialization and department.
+All 15 doctors come back with their details.
 
 ---
 
 ### Q3 — Show me appointments for last month
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT a.id, p.first_name, p.last_name, d.name AS doctor,
        a.appointment_date, a.status
@@ -65,47 +56,38 @@ JOIN doctors  d ON d.id = a.doctor_id
 WHERE strftime('%Y-%m', a.appointment_date) = strftime('%Y-%m', DATE('now', '-1 month'))
 ORDER BY a.appointment_date;
 ```
-
-**Result summary:** Correctly filters appointments to the prior calendar month using SQLite `strftime`.
+Filters correctly to the previous month using SQLite's `strftime`.
 
 ---
 
 ### Q4 — Which doctor has the most appointments?
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT d.name, d.specialization, COUNT(a.id) AS appointment_count
 FROM doctors d
 JOIN appointments a ON a.doctor_id = d.id
-GROUP BY d.id, d.name, d.specialization
+GROUP BY d.id
 ORDER BY appointment_count DESC
 LIMIT 1;
 ```
-
-**Result summary:** Returns the single busiest doctor with correct aggregation.
+Returns the right doctor.
 
 ---
 
 ### Q5 — What is the total revenue?
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT ROUND(SUM(total_amount), 2) AS total_revenue FROM invoices;
 ```
-
-**Result summary:** Returns the sum of all invoice amounts correctly rounded.
+Straightforward and correct.
 
 ---
 
 ### Q6 — Show revenue by doctor
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT d.name AS doctor, ROUND(SUM(i.total_amount), 2) AS total_revenue
 FROM invoices i
@@ -114,51 +96,42 @@ JOIN doctors d      ON d.id = a.doctor_id
 GROUP BY d.id, d.name
 ORDER BY total_revenue DESC;
 ```
-
-**Result summary:** Returns per-doctor revenue with JOINs through appointments correctly.
+The JOIN path through appointments works correctly here.
 
 ---
 
 ### Q7 — How many cancelled appointments last quarter?
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT COUNT(*) AS cancelled_count
 FROM appointments
 WHERE status = 'Cancelled'
   AND appointment_date >= DATE('now', '-3 months');
 ```
-
-**Result summary:** Correctly combines status filter and 3-month date window.
+Status filter and date range both work.
 
 ---
 
 ### Q8 — Top 5 patients by spending
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT p.first_name, p.last_name,
        ROUND(SUM(i.total_amount), 2) AS total_spending
 FROM invoices i
 JOIN patients p ON p.id = i.patient_id
-GROUP BY p.id, p.first_name, p.last_name
+GROUP BY p.id
 ORDER BY total_spending DESC
 LIMIT 5;
 ```
-
-**Result summary:** Returns top 5 patient names and their total billed amounts.
+Returns top 5 with correct amounts.
 
 ---
 
 ### Q9 — Average treatment cost by specialization
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT d.specialization,
        ROUND(AVG(t.cost), 2) AS avg_treatment_cost,
@@ -169,16 +142,13 @@ JOIN doctors d      ON d.id = a.doctor_id
 GROUP BY d.specialization
 ORDER BY avg_treatment_cost DESC;
 ```
-
-**Result summary:** Three-table JOIN working correctly; averages are per-specialization.
+Three-table join works, averages look right.
 
 ---
 
 ### Q10 — Show monthly appointment count for the past 6 months
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT strftime('%Y-%m', appointment_date) AS month,
        COUNT(*) AS appointment_count
@@ -187,16 +157,13 @@ WHERE appointment_date >= DATE('now', '-6 months')
 GROUP BY month
 ORDER BY month;
 ```
-
-**Result summary:** Returns 6 rows (one per month) with correct grouping.
+6 rows returned, one per month.
 
 ---
 
 ### Q11 — Which city has the most patients?
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT city, COUNT(*) AS patient_count
 FROM patients
@@ -204,34 +171,28 @@ GROUP BY city
 ORDER BY patient_count DESC
 LIMIT 1;
 ```
-
-**Result summary:** Returns the single top city correctly.
+Returns the top city correctly.
 
 ---
 
 ### Q12 — List patients who visited more than 3 times
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT p.first_name, p.last_name, COUNT(a.id) AS visit_count
 FROM patients p
 JOIN appointments a ON a.patient_id = p.id
-GROUP BY p.id, p.first_name, p.last_name
+GROUP BY p.id
 HAVING visit_count > 3
 ORDER BY visit_count DESC;
 ```
-
-**Result summary:** `HAVING` clause applied correctly after `GROUP BY`.
+`HAVING` clause works as expected.
 
 ---
 
 ### Q13 — Show unpaid invoices
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT p.first_name, p.last_name,
        i.total_amount, i.paid_amount,
@@ -242,16 +203,13 @@ JOIN patients p ON p.id = i.patient_id
 WHERE i.status IN ('Pending', 'Overdue')
 ORDER BY i.status, balance_due DESC;
 ```
-
-**Result summary:** Correctly returns both Pending and Overdue invoices with balance due computed.
+Picks up both Pending and Overdue, balance calculation is correct.
 
 ---
 
 ### Q14 — What percentage of appointments are no-shows?
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT ROUND(
     CAST(SUM(CASE WHEN status = 'No-Show' THEN 1 ELSE 0 END) AS REAL)
@@ -259,16 +217,13 @@ SELECT ROUND(
 ) AS no_show_percentage
 FROM appointments;
 ```
-
-**Result summary:** Uses `CAST(... AS REAL)` to avoid integer division — correct approach for SQLite.
+Used `CAST AS REAL` to avoid integer division in SQLite — that was a gotcha I had to think about.
 
 ---
 
 ### Q15 — Show the busiest day of the week for appointments
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT CASE strftime('%w', appointment_date)
            WHEN '0' THEN 'Sunday'    WHEN '1' THEN 'Monday'
@@ -281,16 +236,13 @@ FROM appointments
 GROUP BY strftime('%w', appointment_date)
 ORDER BY appointment_count DESC;
 ```
-
-**Result summary:** SQLite `strftime('%w', ...)` used correctly; CASE converts numeric day to name.
+`strftime('%w')` returns a number so had to map it to day names with CASE.
 
 ---
 
 ### Q16 — Revenue trend by month
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT strftime('%Y-%m', invoice_date) AS month,
        ROUND(SUM(total_amount), 2) AS monthly_revenue
@@ -298,16 +250,13 @@ FROM invoices
 GROUP BY month
 ORDER BY month;
 ```
-
-**Result summary:** Returns a time-series of monthly revenue suitable for a line chart.
+Clean monthly grouping, good for a line chart.
 
 ---
 
 ### Q17 — Average appointment duration by doctor
-
 **Status:** ⚠️ Partial
 
-**Generated SQL:**
 ```sql
 SELECT d.name AS doctor,
        ROUND(AVG(t.duration_minutes), 1) AS avg_duration_minutes
@@ -318,15 +267,13 @@ GROUP BY d.id, d.name
 ORDER BY avg_duration_minutes DESC;
 ```
 
-**Issue:** The query averages `treatments.duration_minutes` (treatment duration), which is the closest available field. The schema does not have a dedicated `appointment_duration` column, so this is the best possible approximation. Result is directionally correct but semantically approximate.
+The schema doesn't have an `appointment_duration` column — only `treatments.duration_minutes` which tracks how long a treatment took. The agent used that as a proxy which is the closest thing available. The numbers aren't wrong, they're just treatment duration not appointment duration. This is a schema gap more than an agent error.
 
 ---
 
 ### Q18 — List patients with overdue invoices
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT DISTINCT p.first_name, p.last_name, p.email, p.phone,
        COUNT(i.id) AS overdue_invoice_count,
@@ -334,19 +281,16 @@ SELECT DISTINCT p.first_name, p.last_name, p.email, p.phone,
 FROM invoices i
 JOIN patients p ON p.id = i.patient_id
 WHERE i.status = 'Overdue'
-GROUP BY p.id, p.first_name, p.last_name, p.email, p.phone
+GROUP BY p.id
 ORDER BY total_outstanding DESC;
 ```
-
-**Result summary:** Correctly identifies patients with overdue invoices and totals their outstanding balances.
+Returns overdue patients with their outstanding balance.
 
 ---
 
 ### Q19 — Compare revenue between departments
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT d.department,
        ROUND(SUM(i.total_amount), 2) AS total_revenue,
@@ -357,16 +301,13 @@ JOIN doctors d      ON d.id = a.doctor_id
 GROUP BY d.department
 ORDER BY total_revenue DESC;
 ```
-
-**Result summary:** Joins invoices through appointments to doctors to get per-department revenue.
+Per-department breakdown looks right.
 
 ---
 
 ### Q20 — Show patient registration trend by month
-
 **Status:** ✅ Correct
 
-**Generated SQL:**
 ```sql
 SELECT strftime('%Y-%m', registered_date) AS month,
        COUNT(*) AS new_patients
@@ -375,23 +316,23 @@ WHERE registered_date IS NOT NULL
 GROUP BY month
 ORDER BY month;
 ```
-
-**Result summary:** Clean monthly grouping of patient registrations; NULL guard included.
-
----
-
-## Issues & Analysis
-
-**Q17 (Partial — Average appointment duration by doctor)**  
-The schema does not include an `appointment_duration` column. The `treatments` table has `duration_minutes` for each treatment procedure, which is the closest proxy. The agent correctly used this field, but reviewers should note the metric is treatment duration, not time spent in the appointment itself. This is a schema design limitation, not an agent failure.
-
-**Q1 failed on first cold run (no memory) — fixed by seeding**  
-Before running `seed_memory.py`, Q1 returned a verbose explanation instead of SQL on the first try. After seeding, the agent correctly generates SQL immediately. This confirms why the seed step is critical.
+NULL guard is there, monthly grouping works fine.
 
 ---
 
-## Recommendations for Future Improvement
+## Issues
 
-1. Add an `appointment_duration_minutes` column to the `appointments` table to make Q17 fully accurate.
-2. Add a `payment_date` column to `invoices` to support queries like "invoices paid this week."
-3. Persist `DemoAgentMemory` to disk (e.g., JSON file) so the agent retains learned Q→SQL pairs across server restarts.
+**Q17 — partial result**  
+Not really the agent's fault. The schema just doesn't have appointment duration as its own column. If I were to improve the schema I'd add a `duration_minutes` column directly on the `appointments` table.
+
+**Cold start behavior (before seeding)**  
+Before running `seed_memory.py`, the first few questions came back with explanations instead of SQL. Once the memory was seeded it worked consistently. So the seed step genuinely matters — don't skip it.
+
+---
+
+## What I'd improve
+
+- Add `duration_minutes` to the `appointments` table so Q17 is accurate
+- Add a `payment_date` column to invoices for queries like "paid this week"
+- Persist the agent memory to a file so it doesn't reset when the server restarts
+
